@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+
+# Electron builder output
+dist-electron/
+release/
+
+# macOS
+.DS_Store
+*.dmg
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment / secrets
+.env
+.env.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.pyc
