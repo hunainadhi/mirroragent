@@ -10,6 +10,8 @@ import { createHud, setupHudIpc } from './hud'
 import { startPause, extendPause, endPause } from './pause'
 import { createNotificationWindow, setupNotificationIpc } from './notifications'
 import { startWebSocketServer, stopWebSocketServer } from './websocket'
+import { startScoreUpdater, stopScoreUpdater, calculateScore } from './score'
+import { startDashboard, stopDashboard } from './dashboard'
 import {
   checkPermissions,
   openAccessibilitySettings,
@@ -17,7 +19,7 @@ import {
   allGranted,
 } from './permissions'
 import { IPC } from '../shared/ipc-channels'
-import type { AppConfig, Mode, PauseDuration, FocusScore } from '../shared/types'
+import type { AppConfig, Mode, PauseDuration } from '../shared/types'
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -180,6 +182,7 @@ function setupIpcHandlers(): void {
     createTray()
     createHud()
     createNotificationWindow()
+    startScoreUpdater()
   })
 
   ipcMain.handle(IPC.APPS_SCAN, async () => {
@@ -211,16 +214,7 @@ function setupIpcHandlers(): void {
     rebuildTrayMenu()
   })
 
-  // Score stub — Day 9 computes real values
-  ipcMain.handle(IPC.SCORE_GET, (): FocusScore => ({
-    total: 0,
-    focusRatioPoints: 0,
-    blockResistancePoints: 0,
-    distractionDepthPoints: 0,
-    consistencyPoints: 0,
-    summaryLine: 'Score available after first full session.',
-    color: 'green',
-  }))
+  ipcMain.handle(IPC.SCORE_GET, () => calculateScore())
 
   ipcMain.handle(IPC.BLOCKED_APPS_GET, () => [])
   ipcMain.handle(IPC.BLOCKED_APPS_RESTORE, () => {})
@@ -239,6 +233,7 @@ app.whenReady().then(() => {
   setupHudIpc()
   setupNotificationIpc()
   startWebSocketServer()
+  startDashboard()
 
   const config = getConfig()
 
@@ -251,6 +246,7 @@ app.whenReady().then(() => {
     createTray()
     createHud()
     createNotificationWindow()
+    startScoreUpdater()
   }
 
   app.on('activate', () => {
@@ -269,6 +265,8 @@ app.on('before-quit', () => {
   stopObserver()
   stopClassifier()
   stopWebSocketServer()
+  stopScoreUpdater()
+  stopDashboard()
   destroyTray()
   closeDatabase()
 })
