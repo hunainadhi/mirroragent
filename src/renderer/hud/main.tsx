@@ -49,18 +49,24 @@ function HudApp() {
 
   const pauseMins = Math.ceil(pauseRemaining / 60_000)
 
+  const pillStyle: React.CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    borderRadius: 999,
+    background: 'rgba(14,14,16,0.96)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    userSelect: 'none',
+    WebkitAppRegion: 'drag',
+    boxShadow: `0 2px 12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)`,
+  } as React.CSSProperties
+
   if (!expanded) {
     return (
-      <div
-        className="w-full h-full flex items-center justify-center gap-2 select-none rounded-full"
-        style={{
-          background: 'rgba(15,15,17,0.97)',
-          WebkitAppRegion: 'drag',
-          boxShadow: `0 4px 20px rgba(0,0,0,0.7), 0 0 14px ${dot}22`,
-        } as React.CSSProperties}
-        onMouseEnter={handleMouseEnter}
-      >
-        <div className={mode === 'focus' ? 'dot-pulse' : ''} style={{ width: 12, height: 12, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: `0 0 8px ${dot}cc` }} />
+      <div style={pillStyle} onMouseEnter={handleMouseEnter}>
+        <div className={mode === 'focus' ? 'dot-pulse' : ''} style={{ width: 12, height: 12, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: `0 0 8px ${dot}bb` }} />
         <span style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 800, color: sc, lineHeight: 1, letterSpacing: '-0.5px' }}>
           {score}
         </span>
@@ -70,12 +76,7 @@ function HudApp() {
 
   return (
     <div
-      className="w-full h-full flex items-center px-3 gap-2.5 select-none rounded-2xl"
-      style={{
-        background: 'rgba(15,15,17,0.97)',
-        WebkitAppRegion: 'drag',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.75)',
-      } as React.CSSProperties}
+      style={{ ...pillStyle, justifyContent: 'flex-start', padding: '0 12px', gap: 10, borderRadius: 18 } as React.CSSProperties}
       onMouseLeave={handleMouseLeave}
     >
       <div style={{ width: 10, height: 10, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: `0 0 6px ${dot}99` }} />
