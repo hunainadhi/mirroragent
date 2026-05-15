@@ -164,6 +164,14 @@ export function setupNotificationIpc(): void {
         break
 
       case 'block-it':
+        if (ctx) {
+          writeCorrection({
+            appName: ctx.current.appName,
+            url: ctx.current.url,
+            correctionType: 'retroactive',
+            contextString: `user confirmed distraction — ${ctx.result.reason}`,
+          })
+        }
         void executeBlock('user')
         break
 

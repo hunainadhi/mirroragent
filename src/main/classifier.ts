@@ -13,6 +13,7 @@ import {
 } from '../shared/constants'
 import { getLastWindowInfo, resetLastWindowInfo } from './observer'
 import { handleClassificationResult } from './notifications'
+import { correctionProfile } from '../shared/schema'
 import type { ActiveWindowInfo, ClassificationResult } from '../shared/types'
 
 let screenshotInterval: ReturnType<typeof setInterval> | null = null
@@ -99,6 +100,41 @@ function buildRollingContext(): string {
     .join('\n')
 }
 
+// ── Correction memory ──────────────────────────────────────────────────────
+
+function buildCorrectionMemory(): string {
+  const db = getDb()
+  const rows = db.select().from(correctionProfile)
+    .orderBy(correctionProfile.id)
+    .limit(30)
+    .all()
+
+  if (rows.length === 0) return ''
+
+  // Deduplicate by app+url — latest correction per target wins
+  const seen = new Map<string, { label: string; isWork: boolean }>()
+  for (const row of rows) {
+    const key = row.url
+      ? row.url.replace(/^https?:\/\//, '').split('/')[0]
+      : row.appName ?? ''
+    if (!key) continue
+    seen.set(key, {
+      label: key,
+      isWork: row.correctionType === 'this_is_work',
+    })
+  }
+
+  const workExamples = [...seen.values()].filter((e) => e.isWork).map((e) => e.label)
+  // retroactive = user clicked "Block now", confirming distraction
+  const distractionExamples = [...seen.values()].filter((e) => !e.isWork).map((e) => e.label)
+
+  const lines: string[] = []
+  if (workExamples.length) lines.push(`User confirmed as WORK: ${workExamples.join(', ')}.`)
+  if (distractionExamples.length) lines.push(`User confirmed as DISTRACTION: ${distractionExamples.join(', ')}.`)
+
+  return lines.length ? `\nPast corrections (trust these over your own judgment):\n${lines.join('\n')}` : ''
+}
+
 // ── Confidence threshold ───────────────────────────────────────────────────
 
 function getThreshold(): number {
@@ -125,8 +161,9 @@ async function classify(
     ? `Their known work apps: ${config.workApps.join(', ')}.`
     : ''
   const taskHint = config.taskLabel ? `Current task: "${config.taskLabel}".` : ''
+  const correctionMemory = buildCorrectionMemory()
 
-  const systemPrompt = `You are MirrorAgent, a focus assistant. ${professionHint} ${workAppsHint} ${taskHint}
+  const systemPrompt = `You are MirrorAgent, a focus assistant. ${professionHint} ${workAppsHint} ${taskHint}${correctionMemory}
 Classify the user's current screen activity as work or distraction based on the screenshot and recent window history.
 Respond ONLY with valid JSON matching this schema:
 {"is_distraction": boolean, "confidence": number (0-100), "reason": string (max 20 words), "suggested_action": "block" | "notify" | "allow"}`
