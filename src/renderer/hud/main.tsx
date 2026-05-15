@@ -56,11 +56,11 @@ function HudApp() {
         style={{
           background: 'rgba(15,15,17,0.97)',
           WebkitAppRegion: 'drag',
-          boxShadow: `0 0 0 1px rgba(255,255,255,0.06), 0 4px 16px rgba(0,0,0,0.6), 0 0 12px ${dot}33`,
+          boxShadow: `0 4px 20px rgba(0,0,0,0.7), 0 0 14px ${dot}22`,
         } as React.CSSProperties}
         onMouseEnter={handleMouseEnter}
       >
-        <div style={{ width: 12, height: 12, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: `0 0 6px ${dot}99` }} />
+        <div className={mode === 'focus' ? 'dot-pulse' : ''} style={{ width: 12, height: 12, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: `0 0 8px ${dot}cc` }} />
         <span style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 800, color: sc, lineHeight: 1, letterSpacing: '-0.5px' }}>
           {score}
         </span>
@@ -74,7 +74,7 @@ function HudApp() {
       style={{
         background: 'rgba(15,15,17,0.97)',
         WebkitAppRegion: 'drag',
-        boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 4px 20px rgba(0,0,0,0.7)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.75)',
       } as React.CSSProperties}
       onMouseLeave={handleMouseLeave}
     >
