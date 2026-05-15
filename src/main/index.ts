@@ -8,6 +8,7 @@ import { startClassifier, stopClassifier } from './classifier'
 import { createTray, destroyTray, rebuildTrayMenu } from './tray'
 import { createHud, setupHudIpc } from './hud'
 import { startPause, extendPause, endPause } from './pause'
+import { createNotificationWindow, setupNotificationIpc } from './notifications'
 import {
   checkPermissions,
   openAccessibilitySettings,
@@ -177,6 +178,7 @@ function setupIpcHandlers(): void {
     startClassifier()
     createTray()
     createHud()
+    createNotificationWindow()
   })
 
   ipcMain.handle(IPC.APPS_SCAN, async () => [])
@@ -206,12 +208,10 @@ function setupIpcHandlers(): void {
     color: 'green',
   }))
 
-  // Blocked apps stub — Day 7
   ipcMain.handle(IPC.BLOCKED_APPS_GET, () => [])
   ipcMain.handle(IPC.BLOCKED_APPS_RESTORE, () => {})
   ipcMain.handle(IPC.CORRECTION_SUBMIT, () => {})
   ipcMain.handle(IPC.CORRECTION_RETROACTIVE, () => {})
-  ipcMain.handle(IPC.NOTIFICATION_RESPOND, () => {})
 }
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
@@ -223,6 +223,7 @@ app.whenReady().then(() => {
   initDatabase()
   setupIpcHandlers()
   setupHudIpc()
+  setupNotificationIpc()
 
   const config = getConfig()
 
@@ -234,6 +235,7 @@ app.whenReady().then(() => {
     startClassifier()
     createTray()
     createHud()
+    createNotificationWindow()
   }
 
   app.on('activate', () => {

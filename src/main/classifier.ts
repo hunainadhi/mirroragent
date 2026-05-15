@@ -12,6 +12,7 @@ import {
   DEFAULT_CONFIDENCE_THRESHOLD,
 } from '../shared/constants'
 import { getLastWindowInfo, resetLastWindowInfo } from './observer'
+import { handleClassificationResult } from './notifications'
 import type { ActiveWindowInfo, ClassificationResult } from '../shared/types'
 
 let screenshotInterval: ReturnType<typeof setInterval> | null = null
@@ -210,13 +211,7 @@ async function tick(triggeredByChange = false): Promise<void> {
 
   const threshold = getThreshold()
   if (result.is_distraction && result.confidence >= threshold) {
-    // Day 7 will handle actual blocking — emit event for now
-    const { BrowserWindow } = await import('electron')
-    BrowserWindow.getAllWindows().forEach((w) => {
-      if (!w.isDestroyed()) {
-        w.webContents.send('classifier:result', { result, current })
-      }
-    })
+    handleClassificationResult(result, current)
   }
 }
 
