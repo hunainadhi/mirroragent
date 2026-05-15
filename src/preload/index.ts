@@ -89,6 +89,7 @@ contextBridge.exposeInMainWorld('mirrorAgent', {
 
   // Utilities
   openExtensionFolder: (): Promise<void> => ipcRenderer.invoke(IPC.OPEN_EXTENSION_FOLDER),
+  getAppPath: (): Promise<string> => ipcRenderer.invoke(IPC.APP_PATH_GET),
 
   // Push events from main → renderer
   onModeChanged: (cb: (mode: Mode) => void): Unsubscribe => {

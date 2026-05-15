@@ -13,6 +13,9 @@ export function checkPermissions(): PermissionStatus {
 }
 
 export function openAccessibilitySettings(): void {
+  // Calling with true triggers the macOS "wants to control this computer" prompt
+  // which registers the app in System Settings > Accessibility
+  systemPreferences.isTrustedAccessibilityClient(true)
   shell.openExternal(
     'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
   )

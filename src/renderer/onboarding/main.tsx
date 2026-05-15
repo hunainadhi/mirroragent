@@ -229,6 +229,13 @@ function PermissionsScreen({ onNext }: { onNext: () => void }) {
     return () => { cancelled = true; clearInterval(id) }
   }, [])
 
+  const [notInApps, setNotInApps] = useState(false)
+  useEffect(() => {
+    window.mirrorAgent.getAppPath().then((p) => {
+      setNotInApps(!p.includes('/Applications/'))
+    }).catch(() => {})
+  }, [])
+
   return (
     <Layout step={2} centered>
       <div className="space-y-6">
@@ -236,6 +243,16 @@ function PermissionsScreen({ onNext }: { onNext: () => void }) {
           <h2 className="text-2xl font-semibold">Permissions</h2>
           <p className="text-zinc-500 text-sm">Two are required. Used for nothing except what's described.</p>
         </div>
+
+        {notInApps && (
+          <div className="flex gap-3 p-3 bg-amber-950/40 border border-amber-800/50 rounded-xl">
+            <span className="text-amber-400 text-sm shrink-0">⚠</span>
+            <div>
+              <p className="text-xs text-amber-300 font-medium">Move to Applications first</p>
+              <p className="text-xs text-amber-500/80 mt-0.5">MirrorAgent is running from a DMG. Drag it to Applications before granting permissions — otherwise macOS won't recognise it correctly.</p>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-3">
           <PermissionCard

@@ -22,6 +22,8 @@ import {
 import { IPC } from '../shared/ipc-channels'
 import type { AppConfig, Mode, PauseDuration } from '../shared/types'
 
+app.setName('MirrorAgent')
+
 if (!app.requestSingleInstanceLock()) {
   app.quit()
   process.exit(0)
@@ -218,6 +220,8 @@ function setupIpcHandlers(): void {
   })
 
   ipcMain.handle(IPC.SCORE_GET, () => calculateScore())
+
+  ipcMain.handle(IPC.APP_PATH_GET, () => app.getPath('exe'))
 
   ipcMain.handle(IPC.OPEN_EXTENSION_FOLDER, () => {
     const extensionPath = app.isPackaged
