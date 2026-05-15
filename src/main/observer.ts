@@ -113,7 +113,7 @@ export function startObserver(): void {
 
     if (gate === 'blocklist') {
       const lastAt = recentlyBlocked.get(info.appName) ?? 0
-      if (Date.now() - lastAt > 60_000) {
+      if (Date.now() - lastAt > 5_000) {
         recentlyBlocked.set(info.appName, Date.now())
         void hideApp(info.appName)
         writeBlockLog({
