@@ -3,6 +3,7 @@ import { getConfig, saveConfig } from './config'
 import { startObserver, stopObserver } from './observer'
 import { startClassifier, stopClassifier } from './classifier'
 import { startScoreUpdater, stopScoreUpdater, calculateScore } from './score'
+import { isPaused } from './pause'
 import { IPC } from '../shared/ipc-channels'
 import { AMBIENT_NUDGES } from '../shared/constants'
 
@@ -89,6 +90,14 @@ function showCalibrationSummary(): void {
 let nudgeInterval: ReturnType<typeof setInterval> | null = null
 let sessionStart = Date.now()
 const nudgeSent = new Set<string>()
+let wasInWorkHours: boolean | null = null
+
+function broadcastModeChange(mode: 'focus' | 'free'): void {
+  saveConfig({ mode })
+  BrowserWindow.getAllWindows().forEach((w) => {
+    if (!w.isDestroyed()) w.webContents.send(IPC.MODE_CHANGED, mode)
+  })
+}
 
 export function startNudgeScheduler(): void {
   if (nudgeInterval) return
@@ -97,10 +106,32 @@ export function startNudgeScheduler(): void {
 
   nudgeInterval = setInterval(() => {
     const config = getConfig()
-    if (!config.onboardingComplete || config.mode === 'free') return
-    if (!isWithinWorkingHours()) return
+    if (!config.onboardingComplete) return
 
     maybeIncrementCalibration()
+
+    const inWorkHours = isWithinWorkingHours()
+
+    // Auto-switch to focus when work hours begin (unless user is on a pause)
+    if (inWorkHours && !wasInWorkHours && !isPaused()) {
+      if (config.mode === 'free') {
+        broadcastModeChange('focus')
+        sessionStart = Date.now()
+        nudgeSent.clear()
+        broadcastNudge('Work hours started. Switching to focus.')
+      }
+    }
+
+    // Auto-switch to free when work hours end
+    if (!inWorkHours && wasInWorkHours && config.mode === 'focus' && !isPaused()) {
+      broadcastModeChange('free')
+      broadcastNudge('Work hours over. Switching to free.')
+    }
+
+    wasInWorkHours = inWorkHours
+
+    // Only send nudges during work hours and while in focus mode
+    if (!inWorkHours || config.mode === 'free') return
 
     const sessionMins = (Date.now() - sessionStart) / 60_000
     const score = calculateScore()
