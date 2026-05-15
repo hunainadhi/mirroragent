@@ -22,11 +22,10 @@ export function createHud(): void {
     x: pos.x,
     y: pos.y,
     frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
+    backgroundColor: '#0e0e10',
     alwaysOnTop: true,
     resizable: false,
-    hasShadow: false,
+    hasShadow: true,
     skipTaskbar: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),

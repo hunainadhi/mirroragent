@@ -55,7 +55,7 @@ function HudApp() {
         style={{
           width: '100%', height: '100%',
           borderRadius: 9999,
-          background: 'rgba(14,14,16,0.96)',
+          background: '#0e0e10',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           userSelect: 'none',
           WebkitAppRegion: 'drag',
@@ -76,7 +76,7 @@ function HudApp() {
       style={{
         width: '100%', height: '100%',
         borderRadius: 18,
-        background: 'rgba(14,14,16,0.96)',
+        background: '#0e0e10',
         display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10,
         userSelect: 'none',
         WebkitAppRegion: 'drag',
