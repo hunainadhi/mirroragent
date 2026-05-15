@@ -59,15 +59,27 @@ export function rebuildTrayMenu(): void {
   ]
 
   tray.setContextMenu(Menu.buildFromTemplate(template))
+  updateTrayIcon()
+}
+
+function loadIcon(filename: string): Electron.NativeImage {
+  const p = app.isPackaged
+    ? path.join(process.resourcesPath, filename)
+    : path.join(__dirname, `../../resources/${filename}`)
+  const img = nativeImage.createFromPath(p).resize({ width: 18, height: 18 })
+  img.setTemplateImage(true)
+  return img
+}
+
+export function updateTrayIcon(): void {
+  if (!tray) return
+  const { mode } = getConfig()
+  tray.setImage(mode === 'focus' ? loadIcon('trayIcon.png') : loadIcon('trayIconFree.png'))
 }
 
 export function createTray(): void {
-  const iconPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'trayIcon.png')
-    : path.join(__dirname, '../../resources/trayIcon.png')
-
-  const icon = nativeImage.createFromPath(iconPath).resize({ width: 18, height: 18 })
-  icon.setTemplateImage(true)
+  const { mode } = getConfig()
+  const icon = mode === 'focus' ? loadIcon('trayIcon.png') : loadIcon('trayIconFree.png')
 
   tray = new Tray(icon)
   tray.setToolTip('MirrorAgent')

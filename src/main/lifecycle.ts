@@ -4,6 +4,7 @@ import { startObserver, stopObserver } from './observer'
 import { startClassifier, stopClassifier } from './classifier'
 import { startScoreUpdater, stopScoreUpdater, calculateScore } from './score'
 import { isPaused } from './pause'
+import { updateTrayIcon } from './tray'
 import { IPC } from '../shared/ipc-channels'
 import { AMBIENT_NUDGES } from '../shared/constants'
 
@@ -97,6 +98,7 @@ function broadcastModeChange(mode: 'focus' | 'free'): void {
   BrowserWindow.getAllWindows().forEach((w) => {
     if (!w.isDestroyed()) w.webContents.send(IPC.MODE_CHANGED, mode)
   })
+  updateTrayIcon()
 }
 
 export function initMode(): void {
