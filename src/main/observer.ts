@@ -2,9 +2,13 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { getDb } from './database'
 import { getConfig } from './config'
+import { hideApp, writeBlockLog } from './blocker'
 import { windowTracking } from '../shared/schema'
 import { OBSERVATION_INTERVAL_MS } from '../shared/constants'
 import type { ActiveWindowInfo } from '../shared/types'
+
+// Debounce: don't block the same app more than once per 60s
+const recentlyBlocked = new Map<string, number>()
 
 const execFileAsync = promisify(execFile)
 
@@ -106,6 +110,21 @@ export function startObserver(): void {
     const gate = preClassificationGate(info)
     writeEntry(info, gate)
     lastWindowInfo = info
+
+    if (gate === 'blocklist') {
+      const lastAt = recentlyBlocked.get(info.appName) ?? 0
+      if (Date.now() - lastAt > 60_000) {
+        recentlyBlocked.set(info.appName, Date.now())
+        void hideApp(info.appName)
+        writeBlockLog({
+          appName: info.appName,
+          url: info.url,
+          confidence: 100,
+          reason: 'permanent blocklist',
+          triggerType: 'autonomous',
+        })
+      }
+    }
   }, OBSERVATION_INTERVAL_MS)
 }
 

@@ -132,10 +132,9 @@ export function handleClassificationResult(result: ClassificationResult, current
   if (result.suggested_action === 'allow') return
 
   if (result.suggested_action === 'block') {
-    enterCountdown()
     currentContext = { result, current }
+    enterCountdown()
   } else {
-    // notify
     enterPassive(result, current)
   }
 }
