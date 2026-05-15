@@ -43,9 +43,17 @@ function HudApp() {
     return () => { u1(); u2(); u3(); u4(); u5() }
   }, [])
 
-  const dot = mode === 'focus' ? '#34d399' : '#71717a'
+  const isFocus = mode === 'focus'
   const sc = scoreColor(score)
   const pauseMins = Math.ceil(pauseRemaining / 60_000)
+
+  const dotStyle: React.CSSProperties = isFocus
+    ? { width: 12, height: 12, borderRadius: '50%', background: '#34d399', flexShrink: 0, boxShadow: '0 0 8px #34d399bb' }
+    : { width: 12, height: 12, borderRadius: '50%', background: 'transparent', border: '2px solid #71717a', flexShrink: 0 }
+
+  const dotSmallStyle: React.CSSProperties = isFocus
+    ? { width: 10, height: 10, borderRadius: '50%', background: '#34d399', flexShrink: 0, boxShadow: '0 0 6px #34d39999' }
+    : { width: 10, height: 10, borderRadius: '50%', background: 'transparent', border: '2px solid #71717a', flexShrink: 0 }
 
   const base: React.CSSProperties = {
     width: '100%', height: '100%',
@@ -63,10 +71,7 @@ function HudApp() {
         style={{ ...base, borderRadius: 9999, justifyContent: 'center', gap: 8 }}
         onMouseEnter={() => setHovering(true)}
       >
-        <div
-          className={mode === 'focus' ? 'dot-pulse' : ''}
-          style={{ width: 12, height: 12, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: `0 0 8px ${dot}bb` }}
-        />
+        <div className={isFocus ? 'dot-pulse' : ''} style={dotStyle} />
         <span style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 800, color: sc, lineHeight: 1, letterSpacing: '-0.5px' }}>
           {score}
         </span>
@@ -79,7 +84,7 @@ function HudApp() {
       style={{ ...base, borderRadius: 18, padding: '0 14px', gap: 10 }}
       onMouseLeave={() => setHovering(false)}
     >
-      <div style={{ width: 10, height: 10, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: `0 0 6px ${dot}99` }} />
+      <div style={dotSmallStyle} />
 
       <div style={{ flex: 1, minWidth: 0 }}>
         {nudge ? (
