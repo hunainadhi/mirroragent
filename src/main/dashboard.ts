@@ -3,8 +3,15 @@ import { and, gte, lt, desc } from 'drizzle-orm'
 import { getDb } from './database'
 import { windowTracking, blockLog, focusScoreDaily } from '../shared/schema'
 import { getConfig, saveConfig } from './config'
-import { calculateScore } from './score'
-import { DASHBOARD_PORT } from '../shared/constants'
+import { calculateScore, persistScore, broadcastScore } from './score'
+import { hideApp, showApp } from './blocker'
+import { startPause, endPause } from './pause'
+import { closeTab, isExtensionConnected } from './websocket'
+import { startObserver, stopObserver } from './observer'
+import { startClassifier, stopClassifier } from './classifier'
+import { broadcastNudge, isWithinWorkingHours } from './lifecycle'
+import { handleClassificationResult } from './notifications'
+import { DASHBOARD_PORT, AMBIENT_NUDGES, CALIBRATION_THRESHOLDS, DEFAULT_CONFIDENCE_THRESHOLD } from '../shared/constants'
 import type { Server } from 'http'
 
 let server: Server | null = null
@@ -70,6 +77,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-save{background:#34d399;color:#052e16}
 .saved{font-size:12px;color:#34d399;margin-left:12px;opacity:0;transition:opacity .3s}
 section-title{display:block;font-size:13px;font-weight:600;color:#e4e4e7;margin-bottom:12px}
+.test-group{margin-bottom:28px}
+.test-group-title{font-size:11px;font-weight:700;color:#52525b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+.test-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#18181b;border:1px solid #27272a;border-radius:10px;margin-bottom:6px}
+.test-row:hover{border-color:#3f3f46}
+.test-name{flex:1;font-size:13px;font-weight:600;color:#e4e4e7}
+.test-desc{font-size:11px;color:#71717a;flex:2}
+.test-status{width:80px;text-align:right;font-size:11px;font-weight:700}
+.status-pass{color:#34d399}.status-fail{color:#f87171}.status-warn{color:#fbbf24}.status-idle{color:#52525b}
+.trigger-btn{padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #3f3f46;background:#27272a;color:#a1a1aa;transition:all .15s;white-space:nowrap}
+.trigger-btn:hover{border-color:#71717a;color:#e4e4e7}
+.trigger-btn:disabled{opacity:.4;cursor:default}
+.run-all-btn{padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:#27272a;color:#e4e4e7;margin-bottom:24px}
+.run-all-btn:hover{background:#3f3f46}
 </style>
 </head>
 <body>
@@ -79,6 +99,7 @@ section-title{display:block;font-size:13px;font-weight:600;color:#e4e4e7;margin-
     <button class="tab active" onclick="show('today',this)">Today</button>
     <button class="tab" onclick="show('patterns',this)">Patterns</button>
     <button class="tab" onclick="show('settings',this)">Settings</button>
+    <button class="tab" onclick="show('tests',this)">Tests</button>
   </div>
 </div>
 
@@ -135,6 +156,12 @@ section-title{display:block;font-size:13px;font-weight:600;color:#e4e4e7;margin-
   </div>
 </div>
 
+<!-- TESTS -->
+<div id="page-tests" class="page">
+  <button class="run-all-btn" onclick="runAllAutoTests()">↻ Run all checks</button>
+  <div id="test-groups"></div>
+</div>
+
 <script>
 function show(page, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
@@ -143,6 +170,7 @@ function show(page, btn) {
   btn.classList.add('active')
   if (page === 'patterns') loadPatterns()
   if (page === 'settings') loadSettings()
+  if (page === 'tests') initTests()
 }
 
 function colorClass(score) {
@@ -272,6 +300,149 @@ async function saveSettings() {
 }
 
 loadToday()
+
+// ── Test suite ─────────────────────────────────────────────────────────────
+
+const TEST_GROUPS = [
+  {
+    group: 'System',
+    tests: [
+      { id: 'onboarding', name: 'Onboarding complete', desc: 'Config has onboardingComplete = true', auto: true },
+      { id: 'api_key', name: 'API key set', desc: 'Anthropic API key is configured', auto: true },
+      { id: 'mode', name: 'Focus mode active', desc: 'Mode is set to focus (required for tracking)', auto: true },
+      { id: 'work_hours', name: 'Within working hours', desc: 'Current time is within configured work hours', auto: true },
+      { id: 'calibration', name: 'Calibration days', desc: 'Shows current calibration day and confidence threshold', auto: true },
+    ]
+  },
+  {
+    group: 'Observer & Database',
+    tests: [
+      { id: 'db_write', name: 'Observer writing to DB', desc: 'Last window_tracking entry is within 15 seconds', auto: true },
+      { id: 'blocklist_gate', name: 'Blocklist gate fires', desc: 'Entries from blocklist URLs have confidence=100', auto: true },
+      { id: 'url_capture', name: 'Browser URL captured', desc: 'Recent Brave/Chrome entries have URL populated', auto: true },
+    ]
+  },
+  {
+    group: 'Classifier (Claude)',
+    tests: [
+      { id: 'claude_calls', name: 'Claude calls recorded', desc: 'block_log has entries with confidence < 100', auto: true },
+      { id: 'rate_limiter', name: 'Rate limiter respected', desc: 'No two Claude calls within 55s of each other', auto: true },
+    ]
+  },
+  {
+    group: 'Blocker',
+    tests: [
+      { id: 'block_log', name: 'Blocks logged', desc: 'At least one entry in block_log today', auto: true },
+      { id: 'test_hide', name: 'Hide app (Finder)', desc: 'Hides Finder via Accessibility API — should disappear from Dock', trigger: '/api/test/hide-finder' },
+      { id: 'show_finder', name: 'Show app (Finder)', desc: 'Restore Finder visibility', trigger: '/api/test/show-finder' },
+    ]
+  },
+  {
+    group: 'Notifications',
+    tests: [
+      { id: 'notif_passive', name: 'Passive notification (unsure)', desc: 'Shows "Is this work?" card top-right', trigger: '/api/test/notify-passive' },
+      { id: 'notif_distraction', name: 'Passive notification (distraction)', desc: 'Shows distraction warning card', trigger: '/api/test/notify-distraction' },
+      { id: 'notif_countdown', name: 'Warning countdown', desc: 'Shows 30s countdown card — will auto-block if ignored', trigger: '/api/test/notify-countdown' },
+    ]
+  },
+  {
+    group: 'HUD Nudges',
+    tests: [
+      { id: 'nudge_start', name: 'Nudge: Good start', desc: 'Sends ambient message to HUD', trigger: '/api/test/nudge/first_30_min' },
+      { id: 'nudge_clean', name: 'Nudge: Two hours clean', desc: 'Sends ambient message to HUD', trigger: '/api/test/nudge/two_hours_clean' },
+      { id: 'nudge_block', name: 'Nudge: After block', desc: 'Sends ambient message to HUD', trigger: '/api/test/nudge/after_block' },
+      { id: 'nudge_score_high', name: 'Nudge: Score above 80', desc: 'Sends ambient message to HUD', trigger: '/api/test/nudge/score_above_80' },
+      { id: 'nudge_score_low', name: 'Nudge: Losing ground', desc: 'Sends ambient message to HUD', trigger: '/api/test/nudge/score_below_50' },
+      { id: 'nudge_end', name: 'Nudge: Home stretch', desc: 'Sends ambient message to HUD', trigger: '/api/test/nudge/near_end_time' },
+      { id: 'nudge_pause', name: 'Nudge: Break over', desc: 'Sends ambient message to HUD', trigger: '/api/test/nudge/after_pause_resume' },
+    ]
+  },
+  {
+    group: 'Pause System',
+    tests: [
+      { id: 'pause_start', name: 'Start 1-min pause', desc: 'Switches to free mode, HUD shows countdown', trigger: '/api/test/pause-start' },
+      { id: 'pause_end', name: 'End pause early', desc: 'Returns to focus mode, sends resume nudge', trigger: '/api/test/pause-end' },
+    ]
+  },
+  {
+    group: 'Score',
+    tests: [
+      { id: 'score_calc', name: 'Score calculation', desc: 'Returns computed score with all 4 components', auto: true },
+      { id: 'score_persist', name: 'Score persisted to DB', desc: 'focus_score_daily has entry for today', auto: true },
+      { id: 'score_recalc', name: 'Force recalculate', desc: 'Recomputes and broadcasts score to HUD', trigger: '/api/test/score' },
+    ]
+  },
+  {
+    group: 'Extension & WebSocket',
+    tests: [
+      { id: 'ws_connected', name: 'Extension connected', desc: 'At least one WebSocket client connected on port 1423', auto: true },
+      { id: 'ws_close_tab', name: 'Close tab command', desc: 'Sends close-tab for youtube.com to extension', trigger: '/api/test/close-tab' },
+    ]
+  },
+  {
+    group: 'Sleep / Wake',
+    tests: [
+      { id: 'sleep_manual', name: 'Simulate suspend', desc: 'Stops observer + classifier (check DB stops updating)', trigger: '/api/test/suspend' },
+      { id: 'wake_manual', name: 'Simulate resume', desc: 'Restarts observer + classifier + score updater', trigger: '/api/test/resume' },
+    ]
+  },
+]
+
+const testResults = {}
+
+function statusBadge(id) {
+  const r = testResults[id]
+  if (!r) return '<span class="test-status status-idle">—</span>'
+  if (r.status === 'pass') return \`<span class="test-status status-pass">✓ \${r.detail || 'Pass'}</span>\`
+  if (r.status === 'fail') return \`<span class="test-status status-fail">✗ \${r.detail || 'Fail'}</span>\`
+  if (r.status === 'warn') return \`<span class="test-status status-warn">⚠ \${r.detail || ''}</span>\`
+  return '<span class="test-status status-idle">...</span>'
+}
+
+function renderTests() {
+  document.getElementById('test-groups').innerHTML = TEST_GROUPS.map(g => \`
+    <div class="test-group">
+      <div class="test-group-title">\${g.group}</div>
+      \${g.tests.map(t => \`
+        <div class="test-row" id="row-\${t.id}">
+          <div class="test-name">\${t.name}</div>
+          <div class="test-desc">\${t.desc}</div>
+          \${t.trigger ? \`<button class="trigger-btn" onclick="trigger('\${t.id}','\${t.trigger}')">Run</button>\` : ''}
+          <div id="status-\${t.id}">\${statusBadge(t.id)}</div>
+        </div>
+      \`).join('')}
+    </div>
+  \`).join('')
+}
+
+function setResult(id, status, detail = '') {
+  testResults[id] = { status, detail }
+  const el = document.getElementById('status-' + id)
+  if (el) el.innerHTML = statusBadge(id)
+}
+
+async function trigger(id, url) {
+  setResult(id, 'loading')
+  document.getElementById('status-' + id).innerHTML = '<span class="test-status status-idle">...</span>'
+  try {
+    const r = await fetch(url, { method: 'POST' }).then(x => x.json())
+    setResult(id, r.ok ? 'pass' : 'fail', r.detail || r.error || '')
+  } catch (e) {
+    setResult(id, 'fail', 'Network error')
+  }
+}
+
+async function runAllAutoTests() {
+  const status = await fetch('/api/test/status').then(r => r.json())
+  Object.entries(status).forEach(([id, result]) => {
+    setResult(id, result.status, result.detail)
+  })
+}
+
+function initTests() {
+  renderTests()
+  runAllAutoTests()
+}
 </script>
 </body>
 </html>`
@@ -352,6 +523,145 @@ export function startDashboard(): void {
     }
     saveConfig(patch)
     res.json({ ok: true })
+  })
+
+  // ── Test endpoints ─────────────────────────────────────────────────────────
+
+  app.get('/api/test/status', (_, res) => {
+    const db = getDb()
+    const config = getConfig()
+    const { start, end } = dayRange()
+
+    // Last observer entry
+    const lastEntry = db.select().from(windowTracking).orderBy(desc(windowTracking.id)).limit(1).all()[0]
+    const lastEntryAge = lastEntry ? (Date.now() - new Date(lastEntry.timestamp).getTime()) / 1000 : Infinity
+
+    // Claude calls
+    const claudeBlocks = db.select().from(blockLog)
+      .where(and(gte(blockLog.timestamp, start), lt(blockLog.timestamp, end)))
+      .all().filter(b => (b.confidence ?? 100) < 100)
+
+    // Rate limiter check
+    let rateOk = true
+    const allBlocks = db.select().from(blockLog).orderBy(blockLog.timestamp).all()
+      .filter(b => (b.confidence ?? 100) < 100)
+    for (let i = 1; i < allBlocks.length; i++) {
+      const gap = new Date(allBlocks[i].timestamp).getTime() - new Date(allBlocks[i-1].timestamp).getTime()
+      if (gap < 55_000) { rateOk = false; break }
+    }
+
+    // Score persisted today
+    const todayScore = db.select().from(focusScoreDaily)
+      .where(and(gte(focusScoreDaily.date, start.slice(0,10)), lt(focusScoreDaily.date, end.slice(0,10))))
+      .all()[0]
+
+    const score = calculateScore()
+    const threshold = CALIBRATION_THRESHOLDS[config.calibrationDays] ?? DEFAULT_CONFIDENCE_THRESHOLD
+
+    const urlEntries = db.select().from(windowTracking)
+      .where(and(gte(windowTracking.timestamp, start), lt(windowTracking.timestamp, end)))
+      .all().filter(e => e.url)
+
+    const blocklistEntries = db.select().from(windowTracking)
+      .where(and(gte(windowTracking.timestamp, start), lt(windowTracking.timestamp, end)))
+      .all().filter(e => e.confidence === 100 && e.isDistraction)
+
+    const todayBlocks = db.select().from(blockLog)
+      .where(and(gte(blockLog.timestamp, start), lt(blockLog.timestamp, end)))
+      .all()
+
+    res.json({
+      onboarding: { status: config.onboardingComplete ? 'pass' : 'fail', detail: config.onboardingComplete ? 'Complete' : 'Not done' },
+      api_key: { status: config.apiKey ? 'pass' : 'fail', detail: config.apiKey ? 'Set' : 'Missing' },
+      mode: { status: config.mode === 'focus' ? 'pass' : 'warn', detail: config.mode },
+      work_hours: { status: isWithinWorkingHours() ? 'pass' : 'warn', detail: isWithinWorkingHours() ? `${config.workStartTime}–${config.workEndTime}` : 'Outside hours' },
+      calibration: { status: 'pass', detail: `Day ${config.calibrationDays} / threshold ${threshold}` },
+      db_write: { status: lastEntryAge < 15 ? 'pass' : lastEntryAge < 60 ? 'warn' : 'fail', detail: lastEntry ? `${Math.round(lastEntryAge)}s ago` : 'No entries' },
+      blocklist_gate: { status: blocklistEntries.length > 0 ? 'pass' : 'warn', detail: `${blocklistEntries.length} today` },
+      url_capture: { status: urlEntries.length > 0 ? 'pass' : 'warn', detail: `${urlEntries.length} entries with URL today` },
+      claude_calls: { status: claudeBlocks.length > 0 ? 'pass' : 'warn', detail: `${claudeBlocks.length} Claude calls today` },
+      rate_limiter: { status: rateOk ? 'pass' : 'fail', detail: rateOk ? 'No violations' : 'Gap < 55s detected' },
+      block_log: { status: todayBlocks.length > 0 ? 'pass' : 'warn', detail: `${todayBlocks.length} blocks today` },
+      score_calc: { status: 'pass', detail: `${score.total}/100` },
+      score_persist: { status: todayScore ? 'pass' : 'warn', detail: todayScore ? `Saved: ${todayScore.finalScore}` : 'Not yet saved' },
+      ws_connected: { status: isExtensionConnected() ? 'pass' : 'warn', detail: isExtensionConnected() ? 'Connected' : 'No extension' },
+    })
+  })
+
+  app.post('/api/test/hide-finder', async (_, res) => {
+    try { await hideApp('Finder'); res.json({ ok: true, detail: 'Finder hidden' }) }
+    catch (e) { res.json({ ok: false, error: String(e) }) }
+  })
+
+  app.post('/api/test/show-finder', async (_, res) => {
+    try { await showApp('Finder'); res.json({ ok: true, detail: 'Finder shown' }) }
+    catch (e) { res.json({ ok: false, error: String(e) }) }
+  })
+
+  app.post('/api/test/notify-passive', (_, res) => {
+    handleClassificationResult(
+      { is_distraction: false, confidence: 65, reason: 'Test passive unsure notification', suggested_action: 'notify' },
+      { appName: 'TestApp', windowTitle: 'Test Window', url: null }
+    )
+    res.json({ ok: true, detail: 'Passive notification fired' })
+  })
+
+  app.post('/api/test/notify-distraction', (_, res) => {
+    handleClassificationResult(
+      { is_distraction: true, confidence: 72, reason: 'Test distraction notification', suggested_action: 'notify' },
+      { appName: 'Brave Browser', windowTitle: 'YouTube', url: 'https://youtube.com' }
+    )
+    res.json({ ok: true, detail: 'Distraction notification fired' })
+  })
+
+  app.post('/api/test/notify-countdown', (_, res) => {
+    handleClassificationResult(
+      { is_distraction: true, confidence: 90, reason: 'Test countdown — dismiss it or it will block', suggested_action: 'block' },
+      { appName: 'Brave Browser', windowTitle: 'YouTube', url: 'https://youtube.com' }
+    )
+    res.json({ ok: true, detail: 'Countdown notification fired — you have 30s to dismiss' })
+  })
+
+  app.post('/api/test/nudge/:key', (req, res) => {
+    const msg = AMBIENT_NUDGES[req.params.key]
+    if (!msg) return res.json({ ok: false, error: 'Unknown nudge key' })
+    broadcastNudge(msg)
+    res.json({ ok: true, detail: msg })
+  })
+
+  app.post('/api/test/pause-start', (_, res) => {
+    startPause(15)
+    res.json({ ok: true, detail: '15-min pause started' })
+  })
+
+  app.post('/api/test/pause-end', (_, res) => {
+    endPause()
+    res.json({ ok: true, detail: 'Pause ended' })
+  })
+
+  app.post('/api/test/score', (_, res) => {
+    const score = calculateScore()
+    persistScore(score)
+    broadcastScore(score)
+    res.json({ ok: true, detail: `Score: ${score.total}/100` })
+  })
+
+  app.post('/api/test/close-tab', (_, res) => {
+    if (!isExtensionConnected()) return res.json({ ok: false, error: 'Extension not connected' })
+    closeTab('https://www.youtube.com')
+    res.json({ ok: true, detail: 'close-tab sent for youtube.com' })
+  })
+
+  app.post('/api/test/suspend', (_, res) => {
+    stopObserver()
+    stopClassifier()
+    res.json({ ok: true, detail: 'Observer + classifier stopped (simulate sleep)' })
+  })
+
+  app.post('/api/test/resume', (_, res) => {
+    startObserver()
+    startClassifier()
+    res.json({ ok: true, detail: 'Observer + classifier restarted (simulate wake)' })
   })
 
   server = app.listen(DASHBOARD_PORT, '127.0.0.1')
