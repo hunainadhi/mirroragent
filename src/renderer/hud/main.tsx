@@ -52,16 +52,16 @@ function HudApp() {
   if (!expanded) {
     return (
       <div
-        className="w-full h-full flex items-center justify-center gap-1.5 select-none rounded-full"
+        className="w-full h-full flex items-center justify-center gap-2 select-none rounded-full"
         style={{
-          background: 'rgba(9,9,11,0.88)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(15,15,17,0.97)',
           WebkitAppRegion: 'drag',
+          boxShadow: `0 0 0 1px rgba(255,255,255,0.06), 0 4px 16px rgba(0,0,0,0.6), 0 0 12px ${dot}33`,
         } as React.CSSProperties}
         onMouseEnter={handleMouseEnter}
       >
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }} />
-        <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: sc, lineHeight: 1 }}>
+        <div style={{ width: 12, height: 12, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: `0 0 6px ${dot}99` }} />
+        <span style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 800, color: sc, lineHeight: 1, letterSpacing: '-0.5px' }}>
           {score}
         </span>
       </div>
@@ -72,13 +72,13 @@ function HudApp() {
     <div
       className="w-full h-full flex items-center px-3 gap-2.5 select-none rounded-2xl"
       style={{
-        background: 'rgba(9,9,11,0.92)',
-        backdropFilter: 'blur(10px)',
+        background: 'rgba(15,15,17,0.97)',
         WebkitAppRegion: 'drag',
+        boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 4px 20px rgba(0,0,0,0.7)',
       } as React.CSSProperties}
       onMouseLeave={handleMouseLeave}
     >
-      <div style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+      <div style={{ width: 10, height: 10, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: `0 0 6px ${dot}99` }} />
 
       <div className="flex flex-col min-w-0 flex-1">
         {nudge ? (
@@ -96,7 +96,7 @@ function HudApp() {
         )}
       </div>
 
-      <span style={{ fontSize: 14, fontFamily: 'monospace', fontWeight: 700, color: sc, flexShrink: 0 }}>
+      <span style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 800, color: sc, flexShrink: 0, letterSpacing: '-0.5px' }}>
         {score}
       </span>
     </div>

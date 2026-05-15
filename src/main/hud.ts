@@ -2,7 +2,7 @@ import { BrowserWindow, ipcMain, screen, app } from 'electron'
 import * as path from 'node:path'
 import { getConfig, saveConfig } from './config'
 
-const COLLAPSED = { width: 64, height: 32 }
+const COLLAPSED = { width: 72, height: 36 }
 const EXPANDED = { width: 280, height: 64 }
 
 let hudWindow: BrowserWindow | null = null
