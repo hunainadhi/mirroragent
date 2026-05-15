@@ -28,7 +28,6 @@ export function createHud(): void {
     resizable: false,
     hasShadow: false,
     skipTaskbar: true,
-    roundedCorners: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

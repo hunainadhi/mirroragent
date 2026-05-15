@@ -49,23 +49,20 @@ function HudApp() {
 
   const pauseMins = Math.ceil(pauseRemaining / 60_000)
 
-  const pillStyle: React.CSSProperties = {
-    position: 'absolute',
-    inset: 0,
-    borderRadius: 999,
-    background: 'rgba(14,14,16,0.96)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    userSelect: 'none',
-    WebkitAppRegion: 'drag',
-    boxShadow: `0 2px 12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)`,
-  } as React.CSSProperties
-
   if (!expanded) {
     return (
-      <div style={pillStyle} onMouseEnter={handleMouseEnter}>
+      <div
+        style={{
+          width: '100%', height: '100%',
+          borderRadius: 9999,
+          background: 'rgba(14,14,16,0.96)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          userSelect: 'none',
+          WebkitAppRegion: 'drag',
+          overflow: 'hidden',
+        } as React.CSSProperties}
+        onMouseEnter={handleMouseEnter}
+      >
         <div className={mode === 'focus' ? 'dot-pulse' : ''} style={{ width: 12, height: 12, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: `0 0 8px ${dot}bb` }} />
         <span style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 800, color: sc, lineHeight: 1, letterSpacing: '-0.5px' }}>
           {score}
@@ -76,7 +73,15 @@ function HudApp() {
 
   return (
     <div
-      style={{ ...pillStyle, justifyContent: 'flex-start', padding: '0 12px', gap: 10, borderRadius: 18 } as React.CSSProperties}
+      style={{
+        width: '100%', height: '100%',
+        borderRadius: 18,
+        background: 'rgba(14,14,16,0.96)',
+        display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10,
+        userSelect: 'none',
+        WebkitAppRegion: 'drag',
+        overflow: 'hidden',
+      } as React.CSSProperties}
       onMouseLeave={handleMouseLeave}
     >
       <div style={{ width: 10, height: 10, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: `0 0 6px ${dot}99` }} />
