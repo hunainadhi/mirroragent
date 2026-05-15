@@ -11,9 +11,7 @@ const config: Configuration = {
   ],
 
   extraResources: [
-    { from: 'resources/trayIcon.png', to: 'trayIcon.png' },
-    { from: 'resources/trayIconFree.png', to: 'trayIconFree.png' },
-    { from: 'extension', to: 'extension' },
+    { from: 'out/extension', to: 'extension' },
   ],
 
   asarUnpack: [

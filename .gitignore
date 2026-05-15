@@ -4,6 +4,8 @@ node_modules/
 # Build output
 out/
 dist/
+# Extension copy created during packaging
+out/extension/
 
 # Icon build artifacts
 resources/icons.iconset/
