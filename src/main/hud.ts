@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, screen, app } from 'electron'
+import { BrowserWindow, ipcMain, screen } from 'electron'
 import * as path from 'node:path'
 import { getConfig, saveConfig } from './config'
 
@@ -9,10 +9,11 @@ let hudWindow: BrowserWindow | null = null
 
 export function createHud(): void {
   const config = getConfig()
-  const display = screen.getPrimaryDisplay()
-  const { width: sw, height: sh } = display.workAreaSize
+  const cursor = screen.getCursorScreenPoint()
+  const display = screen.getDisplayNearestPoint(cursor)
+  const { x: dx, y: dy, width: dw, height: dh } = display.workArea
 
-  const defaultPos = { x: sw - COLLAPSED.width - 16, y: sh - COLLAPSED.height - 16 }
+  const defaultPos = { x: dx + dw - COLLAPSED.width - 16, y: dy + dh - COLLAPSED.height - 16 }
   const pos = config.hudPosition ?? defaultPos
 
   hudWindow = new BrowserWindow({

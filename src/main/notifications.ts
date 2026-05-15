@@ -20,14 +20,15 @@ let currentContext: { result: ClassificationResult; current: ActiveWindowInfo } 
 // ── Window ─────────────────────────────────────────────────────────────────
 
 export function createNotificationWindow(): void {
-  const display = screen.getPrimaryDisplay()
-  const { width } = display.workAreaSize
+  const cursor = screen.getCursorScreenPoint()
+  const display = screen.getDisplayNearestPoint(cursor)
+  const { x: dx, y: dy, width: dw } = display.workArea
 
   notifWindow = new BrowserWindow({
     width: WIN_W,
     height: WIN_H,
-    x: width - WIN_W - 16,
-    y: 24,
+    x: dx + dw - WIN_W - 16,
+    y: dy + 24,
     frame: false,
     transparent: true,
     alwaysOnTop: true,

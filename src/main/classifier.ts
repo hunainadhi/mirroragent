@@ -1,4 +1,4 @@
-import { desktopCapturer } from 'electron'
+import { desktopCapturer, screen } from 'electron'
 import Anthropic from '@anthropic-ai/sdk'
 import { eq } from 'drizzle-orm'
 import { getDb } from './database'
@@ -54,11 +54,18 @@ async function captureScreenshot(): Promise<string | null> {
       types: ['screen'],
       thumbnailSize: { width: 640, height: 400 },
     })
-    const primary = sources[0]
-    if (!primary) return null
+    if (sources.length === 0) return null
 
-    const png = primary.thumbnail.toPNG()
-    return png.toString('base64')
+    // On multi-monitor setups, capture the display where the cursor is
+    let source = sources[0]
+    if (sources.length > 1) {
+      const cursor = screen.getCursorScreenPoint()
+      const active = screen.getDisplayNearestPoint(cursor)
+      const match = sources.find((s) => s.display_id === String(active.id))
+      if (match) source = match
+    }
+
+    return source.thumbnail.toPNG().toString('base64')
   } catch {
     return null
   }
