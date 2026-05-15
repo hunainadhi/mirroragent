@@ -7,13 +7,6 @@ import { windowTracking } from '../shared/schema'
 import { OBSERVATION_INTERVAL_MS } from '../shared/constants'
 import type { ActiveWindowInfo } from '../shared/types'
 
-function withinWorkHours(start?: string, end?: string): boolean {
-  if (!start || !end) return true
-  const now = new Date().getHours() * 60 + new Date().getMinutes()
-  const parse = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0) }
-  return now >= parse(start) && now < parse(end)
-}
-
 // Debounce: don't block the same app more than once per 60s
 const recentlyBlocked = new Map<string, number>()
 
@@ -110,7 +103,6 @@ export function startObserver(): void {
   observerInterval = setInterval(async () => {
     const config = getConfig()
     if (!config.onboardingComplete || config.mode === 'free') return
-    if (!withinWorkHours(config.workStartTime, config.workEndTime)) return
 
     const info = await getActiveWindowInfo()
     if (!info) return
