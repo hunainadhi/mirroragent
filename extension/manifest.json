@@ -3,7 +3,7 @@
   "name": "MirrorAgent",
   "version": "1.0.0",
   "description": "Companion extension for MirrorAgent distraction blocker",
-  "permissions": ["tabs", "storage"],
+  "permissions": ["tabs", "storage", "alarms"],
   "background": {
     "service_worker": "background.js"
   },

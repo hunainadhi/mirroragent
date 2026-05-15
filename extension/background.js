@@ -59,11 +59,24 @@ async function closeMatchingTabs(targetUrl) {
   if (ids.length > 0) chrome.tabs.remove(ids)
 }
 
-// Connect on startup and keep alive
+// Connect on startup
 connect()
 
-// Service workers can be killed — reconnect when woken
+// Use alarms to keep service worker alive and maintain WebSocket connection
+// Alarms fire even after the service worker would normally be killed
+chrome.alarms.create('keepAlive', { periodInMinutes: 0.4 }) // every ~24s
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'keepAlive') {
+    // Re-connect if socket dropped
+    if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+      connect()
+    }
+  }
+})
+
 chrome.runtime.onStartup.addListener(connect)
+chrome.runtime.onInstalled.addListener(connect)
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg === 'ping') connect()
 })
