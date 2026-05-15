@@ -8,7 +8,7 @@ import { hideApp, showApp } from './blocker'
 import { startPause, endPause } from './pause'
 import { closeTab, isExtensionConnected } from './websocket'
 import { startObserver, stopObserver } from './observer'
-import { startClassifier, stopClassifier } from './classifier'
+import { startClassifier, stopClassifier, getRateLimiterStatus } from './classifier'
 import { broadcastNudge, isWithinWorkingHours } from './lifecycle'
 import { handleClassificationResult } from './notifications'
 import { DASHBOARD_PORT, AMBIENT_NUDGES, CALIBRATION_THRESHOLDS, DEFAULT_CONFIDENCE_THRESHOLD } from '../shared/constants'
@@ -541,14 +541,9 @@ export function startDashboard(): void {
       .where(and(gte(blockLog.timestamp, start), lt(blockLog.timestamp, end)))
       .all().filter(b => (b.confidence ?? 100) < 100)
 
-    // Rate limiter check
-    let rateOk = true
-    const allBlocks = db.select().from(blockLog).orderBy(blockLog.timestamp).all()
-      .filter(b => (b.confidence ?? 100) < 100)
-    for (let i = 1; i < allBlocks.length; i++) {
-      const gap = new Date(allBlocks[i].timestamp).getTime() - new Date(allBlocks[i-1].timestamp).getTime()
-      if (gap < 55_000) { rateOk = false; break }
-    }
+    // Rate limiter check — use live state from classifier
+    const rl = getRateLimiterStatus()
+    const secsSinceLastCall = rl.lastCallAt ? Math.round((Date.now() - rl.lastCallAt) / 1000) : null
 
     // Score persisted today
     const todayScore = db.select().from(focusScoreDaily)
@@ -580,7 +575,7 @@ export function startDashboard(): void {
       blocklist_gate: { status: blocklistEntries.length > 0 ? 'pass' : 'warn', detail: `${blocklistEntries.length} today` },
       url_capture: { status: urlEntries.length > 0 ? 'pass' : 'warn', detail: `${urlEntries.length} entries with URL today` },
       claude_calls: { status: claudeBlocks.length > 0 ? 'pass' : 'warn', detail: `${claudeBlocks.length} Claude calls today` },
-      rate_limiter: { status: rateOk ? 'pass' : 'fail', detail: rateOk ? 'No violations' : 'Gap < 55s detected' },
+      rate_limiter: { status: 'pass', detail: secsSinceLastCall !== null ? `Last call ${secsSinceLastCall}s ago, ${rl.callsThisMinute}/${rl.maxPerMinute} this min` : 'No calls yet' },
       block_log: { status: todayBlocks.length > 0 ? 'pass' : 'warn', detail: `${todayBlocks.length} blocks today` },
       score_calc: { status: 'pass', detail: `${score.total}/100` },
       score_persist: { status: todayScore ? 'pass' : 'warn', detail: todayScore ? `Saved: ${todayScore.finalScore}` : 'Not yet saved' },

@@ -270,3 +270,7 @@ export function stopClassifier(): void {
     screenshotInterval = null
   }
 }
+
+export function getRateLimiterStatus(): { lastCallAt: number; callsThisMinute: number; minGapMs: number; maxPerMinute: number } {
+  return { lastCallAt, callsThisMinute, minGapMs: MIN_MS_BETWEEN_CALLS, maxPerMinute: MAX_CALLS_PER_MINUTE }
+}
