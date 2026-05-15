@@ -12,6 +12,7 @@ import { createNotificationWindow, setupNotificationIpc } from './notifications'
 import { startWebSocketServer, stopWebSocketServer } from './websocket'
 import { startScoreUpdater, stopScoreUpdater, calculateScore } from './score'
 import { startDashboard, stopDashboard } from './dashboard'
+import { setupPowerMonitor, startNudgeScheduler, stopNudgeScheduler } from './lifecycle'
 import {
   checkPermissions,
   openAccessibilitySettings,
@@ -183,6 +184,7 @@ function setupIpcHandlers(): void {
     createHud()
     createNotificationWindow()
     startScoreUpdater()
+    startNudgeScheduler()
   })
 
   ipcMain.handle(IPC.APPS_SCAN, async () => {
@@ -234,6 +236,7 @@ app.whenReady().then(() => {
   setupNotificationIpc()
   startWebSocketServer()
   startDashboard()
+  setupPowerMonitor()
 
   const config = getConfig()
 
@@ -247,6 +250,7 @@ app.whenReady().then(() => {
     createHud()
     createNotificationWindow()
     startScoreUpdater()
+    startNudgeScheduler()
   }
 
   app.on('activate', () => {
@@ -266,6 +270,7 @@ app.on('before-quit', () => {
   stopClassifier()
   stopWebSocketServer()
   stopScoreUpdater()
+  stopNudgeScheduler()
   stopDashboard()
   destroyTray()
   closeDatabase()

@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { saveConfig } from './config'
 import { IPC } from '../shared/ipc-channels'
+import { nudgeAfterPauseResume } from './lifecycle'
 import type { PauseDuration } from '../shared/types'
 
 const COOLDOWN_MS = 10 * 60 * 1_000
@@ -32,6 +33,7 @@ function startTicker(): void {
       saveConfig({ mode: 'focus' })
       broadcast(IPC.PAUSE_ENDED)
       broadcast(IPC.MODE_CHANGED, 'focus')
+      nudgeAfterPauseResume()
     } else {
       broadcast(IPC.PAUSE_TICK, remaining)
     }
@@ -60,6 +62,7 @@ export function endPause(): void {
   saveConfig({ mode: 'focus' })
   broadcast(IPC.PAUSE_ENDED)
   broadcast(IPC.MODE_CHANGED, 'focus')
+  nudgeAfterPauseResume()
 }
 
 export function isPaused(): boolean {

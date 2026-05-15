@@ -3,6 +3,7 @@ import { promisify } from 'node:util'
 import { getDb } from './database'
 import { getConfig } from './config'
 import { hideApp, writeBlockLog } from './blocker'
+import { isWithinWorkingHours } from './lifecycle'
 import { windowTracking } from '../shared/schema'
 import { OBSERVATION_INTERVAL_MS } from '../shared/constants'
 import type { ActiveWindowInfo } from '../shared/types'
@@ -103,6 +104,7 @@ export function startObserver(): void {
   observerInterval = setInterval(async () => {
     const config = getConfig()
     if (!config.onboardingComplete || config.mode === 'free') return
+    if (!isWithinWorkingHours()) return
 
     const info = await getActiveWindowInfo()
     if (!info) return

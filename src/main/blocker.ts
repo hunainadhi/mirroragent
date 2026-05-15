@@ -4,6 +4,7 @@ import { getDb } from './database'
 import { blockLog, correctionProfile } from '../shared/schema'
 import { getConfig } from './config'
 import { closeTab, isExtensionConnected } from './websocket'
+import { nudgeAfterBlock } from './lifecycle'
 
 const execFileAsync = promisify(execFile)
 
@@ -12,6 +13,7 @@ function osascript(script: string): Promise<void> {
 }
 
 export async function hideApp(appName: string, url?: string | null): Promise<void> {
+  nudgeAfterBlock()
   // If extension is connected and we have a URL, close the specific tab instead of hiding the whole app
   if (url && isExtensionConnected()) {
     closeTab(url)
