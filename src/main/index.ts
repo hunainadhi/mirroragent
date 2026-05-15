@@ -9,6 +9,7 @@ import { createTray, destroyTray, rebuildTrayMenu } from './tray'
 import { createHud, setupHudIpc } from './hud'
 import { startPause, extendPause, endPause } from './pause'
 import { createNotificationWindow, setupNotificationIpc } from './notifications'
+import { startWebSocketServer, stopWebSocketServer } from './websocket'
 import {
   checkPermissions,
   openAccessibilitySettings,
@@ -181,7 +182,20 @@ function setupIpcHandlers(): void {
     createNotificationWindow()
   })
 
-  ipcMain.handle(IPC.APPS_SCAN, async () => [])
+  ipcMain.handle(IPC.APPS_SCAN, async () => {
+    const { readdirSync } = await import('node:fs')
+    const { KNOWN_WORK_APPS } = await import('../shared/constants')
+    try {
+      const installed = readdirSync('/Applications')
+        .filter((f) => f.endsWith('.app'))
+        .map((f) => f.replace(/\.app$/, ''))
+      return KNOWN_WORK_APPS.filter((app) =>
+        installed.some((name) => name.toLowerCase().includes(app.toLowerCase()))
+      )
+    } catch {
+      return []
+    }
+  })
 
   // Pause
   ipcMain.handle(IPC.PAUSE_START, (_, duration: PauseDuration) => {
@@ -224,6 +238,7 @@ app.whenReady().then(() => {
   setupIpcHandlers()
   setupHudIpc()
   setupNotificationIpc()
+  startWebSocketServer()
 
   const config = getConfig()
 
@@ -253,6 +268,7 @@ app.on('before-quit', () => {
   if (permissionPollInterval) clearInterval(permissionPollInterval)
   stopObserver()
   stopClassifier()
+  stopWebSocketServer()
   destroyTray()
   closeDatabase()
 })

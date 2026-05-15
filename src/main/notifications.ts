@@ -107,7 +107,7 @@ async function executeBlock(triggerType: string): Promise<void> {
   if (!ctx) return
 
   const { current, result } = ctx
-  await hideApp(current.appName)
+  await hideApp(current.appName, current.url)
   writeBlockLog({
     appName: current.appName,
     url: current.url,

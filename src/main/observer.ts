@@ -115,7 +115,7 @@ export function startObserver(): void {
       const lastAt = recentlyBlocked.get(info.appName) ?? 0
       if (Date.now() - lastAt > 5_000) {
         recentlyBlocked.set(info.appName, Date.now())
-        void hideApp(info.appName)
+        void hideApp(info.appName, info.url)
         writeBlockLog({
           appName: info.appName,
           url: info.url,

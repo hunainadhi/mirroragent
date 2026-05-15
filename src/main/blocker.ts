@@ -3,6 +3,7 @@ import { promisify } from 'node:util'
 import { getDb } from './database'
 import { blockLog, correctionProfile } from '../shared/schema'
 import { getConfig } from './config'
+import { closeTab, isExtensionConnected } from './websocket'
 
 const execFileAsync = promisify(execFile)
 
@@ -10,7 +11,12 @@ function osascript(script: string): Promise<void> {
   return execFileAsync('osascript', ['-e', script], { timeout: 3_000 }).then(() => {}).catch(() => {})
 }
 
-export async function hideApp(appName: string): Promise<void> {
+export async function hideApp(appName: string, url?: string | null): Promise<void> {
+  // If extension is connected and we have a URL, close the specific tab instead of hiding the whole app
+  if (url && isExtensionConnected()) {
+    closeTab(url)
+    return
+  }
   const safe = appName.replace(/"/g, '')
   await osascript(`tell application "System Events" to set visible of process "${safe}" to false`)
 }
