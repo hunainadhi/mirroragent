@@ -84,6 +84,9 @@ contextBridge.exposeInMainWorld('mirrorAgent', {
   respondToNotification: (action: NotificationAction): Promise<void> =>
     ipcRenderer.invoke(IPC.NOTIFICATION_RESPOND, action),
 
+  // HUD
+  resizeHud: (expanded: boolean): void => ipcRenderer.send(IPC.HUD_RESIZE, expanded),
+
   // Push events from main → renderer
   onModeChanged: (cb: (mode: Mode) => void): Unsubscribe => {
     const handler = (_: Electron.IpcRendererEvent, mode: Mode) => cb(mode)

@@ -34,6 +34,7 @@ declare global {
       onPauseEnded: (cb: () => void) => Unsubscribe
       onNotificationFire: (cb: (data: unknown) => void) => Unsubscribe
       onNotificationCountdown: (cb: (seconds: number) => void) => Unsubscribe
+      resizeHud: (expanded: boolean) => void
     }
   }
 }

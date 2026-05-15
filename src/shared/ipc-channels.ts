@@ -22,6 +22,9 @@ export const IPC = {
   NOTIFICATION_RESPOND: 'notification:respond',
   ONBOARDING_COMPLETE: 'onboarding:complete',
 
+  // Renderer → Main (send, no reply)
+  HUD_RESIZE: 'hud:resize',
+
   // Main → Renderer (send)
   MODE_CHANGED: 'mode:changed',
   SCORE_UPDATED: 'score:updated',

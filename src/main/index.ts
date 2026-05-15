@@ -5,6 +5,9 @@ import { loadConfig, getConfig, saveConfig } from './config'
 import { initDatabase, closeDatabase } from './database'
 import { startObserver, stopObserver } from './observer'
 import { startClassifier, stopClassifier } from './classifier'
+import { createTray, destroyTray, rebuildTrayMenu } from './tray'
+import { createHud, setupHudIpc } from './hud'
+import { startPause, extendPause, endPause } from './pause'
 import {
   checkPermissions,
   openAccessibilitySettings,
@@ -12,7 +15,7 @@ import {
   allGranted,
 } from './permissions'
 import { IPC } from '../shared/ipc-channels'
-import type { AppConfig, Mode } from '../shared/types'
+import type { AppConfig, Mode, PauseDuration, FocusScore } from '../shared/types'
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -98,16 +101,13 @@ function startPermissionMonitor(): void {
 
     const status = checkPermissions()
     if (!allGranted(status)) {
-      // Notify all windows
       BrowserWindow.getAllWindows().forEach((w) => {
         if (!w.isDestroyed()) w.webContents.send(IPC.PERMISSION_LOST, status)
       })
-      // Show recovery window if not already showing
       if (!recoveryWindow || recoveryWindow.isDestroyed()) {
         createRecoveryWindow()
       }
     } else if (recoveryWindow && !recoveryWindow.isDestroyed()) {
-      // Permissions restored — close recovery window
       recoveryWindow.close()
     }
   }, 10_000)
@@ -136,10 +136,12 @@ function setupIpcHandlers(): void {
     BrowserWindow.getAllWindows().forEach((w) => {
       if (!w.isDestroyed()) w.webContents.send(IPC.MODE_CHANGED, mode)
     })
+    rebuildTrayMenu()
   })
 
   ipcMain.handle(IPC.TASK_LABEL_SET, (_, label: string) => {
     saveConfig({ taskLabel: label })
+    rebuildTrayMenu()
   })
 
   ipcMain.handle(IPC.API_KEY_VALIDATE, async (_, apiKey: string) => {
@@ -155,7 +157,6 @@ function setupIpcHandlers(): void {
       saveConfig({ apiKey: trimmed })
       return true
     } catch (err: unknown) {
-      // 429 = rate limited but key is valid
       if ((err as { status?: number })?.status === 429) {
         saveConfig({ apiKey: trimmed })
         return true
@@ -165,34 +166,63 @@ function setupIpcHandlers(): void {
   })
 
   ipcMain.handle(IPC.PERMISSIONS_CHECK, () => checkPermissions())
-
-  ipcMain.handle(IPC.PERMISSIONS_OPEN_ACCESSIBILITY, () => {
-    openAccessibilitySettings()
-  })
-
+  ipcMain.handle(IPC.PERMISSIONS_OPEN_ACCESSIBILITY, () => openAccessibilitySettings())
   ipcMain.handle(IPC.PERMISSIONS_OPEN_SCREEN_RECORDING, () => openScreenRecordingSettings())
 
   ipcMain.handle(IPC.ONBOARDING_COMPLETE, (_, data: Partial<AppConfig>) => {
-    saveConfig({ ...data, onboardingComplete: true })
+    saveConfig({ ...data, onboardingComplete: true, mode: 'focus' })
     onboardingWindow?.close()
     startPermissionMonitor()
     startObserver()
     startClassifier()
-    // Day 6: create tray + HUD here
+    createTray()
+    createHud()
   })
 
-  ipcMain.handle(IPC.APPS_SCAN, async () => {
-    // Day 8: scan /Applications and filter by KNOWN_WORK_APPS
-    return []
+  ipcMain.handle(IPC.APPS_SCAN, async () => [])
+
+  // Pause
+  ipcMain.handle(IPC.PAUSE_START, (_, duration: PauseDuration) => {
+    startPause(duration)
+    rebuildTrayMenu()
   })
+  ipcMain.handle(IPC.PAUSE_EXTEND, () => {
+    extendPause()
+    rebuildTrayMenu()
+  })
+  ipcMain.handle(IPC.PAUSE_END, () => {
+    endPause()
+    rebuildTrayMenu()
+  })
+
+  // Score stub — Day 9 computes real values
+  ipcMain.handle(IPC.SCORE_GET, (): FocusScore => ({
+    total: 0,
+    focusRatioPoints: 0,
+    blockResistancePoints: 0,
+    distractionDepthPoints: 0,
+    consistencyPoints: 0,
+    summaryLine: 'Score available after first full session.',
+    color: 'green',
+  }))
+
+  // Blocked apps stub — Day 7
+  ipcMain.handle(IPC.BLOCKED_APPS_GET, () => [])
+  ipcMain.handle(IPC.BLOCKED_APPS_RESTORE, () => {})
+  ipcMain.handle(IPC.CORRECTION_SUBMIT, () => {})
+  ipcMain.handle(IPC.CORRECTION_RETROACTIVE, () => {})
+  ipcMain.handle(IPC.NOTIFICATION_RESPOND, () => {})
 }
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
+  app.dock?.hide()
+
   loadConfig()
   initDatabase()
   setupIpcHandlers()
+  setupHudIpc()
 
   const config = getConfig()
 
@@ -202,18 +232,18 @@ app.whenReady().then(() => {
     startPermissionMonitor()
     startObserver()
     startClassifier()
-    // Day 6: show tray instead of re-opening onboarding
-    onboardingWindow = createOnboardingWindow()
+    createTray()
+    createHud()
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      onboardingWindow = createOnboardingWindow()
-    }
+    // On macOS, clicking the dock icon when all windows are closed
+    // should do nothing (menubar-only app)
   })
 })
 
 app.on('window-all-closed', () => {
+  // Don't quit on macOS when all windows close — tray keeps the app alive
   if (process.platform !== 'darwin') app.quit()
 })
 
@@ -221,5 +251,6 @@ app.on('before-quit', () => {
   if (permissionPollInterval) clearInterval(permissionPollInterval)
   stopObserver()
   stopClassifier()
+  destroyTray()
   closeDatabase()
 })
