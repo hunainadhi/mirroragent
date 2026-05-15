@@ -445,38 +445,63 @@ function Section({ label, hint, children }: { label: string; hint?: string; chil
 // ── Screen 4: Browser Extension ────────────────────────────────────────────
 
 function ExtensionScreen({ onNext }: { onNext: () => void }) {
+  const [copied, setCopied] = React.useState(false)
+
+  function copyPath() {
+    const extensionPath = window.mirrorAgent
+      ? '~/Applications/mirroragent.app/Contents/Resources/extension'
+      : 'MirrorAgent.app/Contents/Resources/extension'
+    navigator.clipboard.writeText(extensionPath).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <Layout step={4} centered>
-      <div className="space-y-7">
+      <div className="space-y-6">
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold">Browser extension</h2>
-          <p className="text-zinc-400 text-sm">Required for browser tab blocking. Without it, only native apps can be blocked.</p>
+          <p className="text-zinc-400 text-sm">Enables tab-level blocking in Chrome and Brave. Without it, the whole browser is hidden instead of just the tab.</p>
         </div>
 
-        <div className="space-y-3">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-4">
+          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Install in Chrome or Brave</p>
+          <ol className="space-y-3 text-sm text-zinc-300">
+            <li className="flex gap-3">
+              <span className="text-zinc-600 font-mono text-xs mt-0.5 w-4 shrink-0">1.</span>
+              <span>Open <span className="font-medium text-white">chrome://extensions</span> or <span className="font-medium text-white">brave://extensions</span></span>
+            </li>
+            <li className="flex gap-3">
+              <span className="text-zinc-600 font-mono text-xs mt-0.5 w-4 shrink-0">2.</span>
+              <span>Enable <span className="font-medium text-white">Developer mode</span> (top-right toggle)</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="text-zinc-600 font-mono text-xs mt-0.5 w-4 shrink-0">3.</span>
+              <span>Click <span className="font-medium text-white">Load unpacked</span> and select the extension folder</span>
+            </li>
+          </ol>
+
           <button
-            disabled
-            className="w-full py-3 bg-zinc-900 border border-zinc-800 text-zinc-500 rounded-xl font-medium text-sm cursor-not-allowed flex items-center justify-center gap-2"
+            onClick={copyPath}
+            className="w-full mt-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 rounded-lg text-xs font-mono transition-colors flex items-center justify-center gap-2"
           >
-            Install for Chrome
-            <span className="text-xs text-zinc-700">· coming in Day 8</span>
+            {copied ? '✓ Copied' : '📋 Copy extension folder path'}
           </button>
-          <button
-            disabled
-            className="w-full py-3 bg-zinc-900 border border-zinc-800 text-zinc-500 rounded-xl font-medium text-sm cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            Install for Safari
-            <span className="text-xs text-zinc-700">· coming in Day 8</span>
-          </button>
+          <p className="text-xs text-zinc-600 text-center">The extension is bundled inside MirrorAgent.app</p>
         </div>
 
         <div className="space-y-3 text-center">
-          <p className="text-xs text-zinc-600">You can install this later from settings.</p>
           <button
             onClick={onNext}
-            className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="w-full py-3 bg-white text-black rounded-xl font-semibold text-sm hover:bg-zinc-100 transition-colors"
           >
-            Skip for now →
+            Done →
+          </button>
+          <button
+            onClick={onNext}
+            className="text-sm text-zinc-600 hover:text-zinc-400 transition-colors"
+          >
+            Skip for now
           </button>
         </div>
       </div>
