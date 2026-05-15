@@ -5,6 +5,9 @@ node_modules/
 out/
 dist/
 
+# Icon build artifacts
+resources/icons.iconset/
+
 # Electron builder output
 dist-electron/
 release/

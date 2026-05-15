@@ -40,6 +40,7 @@ export function rebuildTrayMenu(): void {
         const next = config.mode === 'focus' ? 'free' : 'focus'
         saveConfig({ mode: next })
         broadcast(IPC.MODE_CHANGED, next)
+        updateTrayIcon()
         rebuildTrayMenu()
       },
     },
