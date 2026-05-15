@@ -1,6 +1,8 @@
 import { Tray, Menu, BrowserWindow, nativeImage, shell, app } from 'electron'
-import * as path from 'node:path'
 import { getConfig, saveConfig } from './config'
+
+const ICON_FILLED = 'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAARklEQVR4nO3NwQ0AIAxC0e4/qGvgAkaB2oOxP+H6iOjYAIzVroOpAxaVcBWl8RLYRY94ww/DGXyLlsIOTqEqLqHMgQ3+1wR/miierM7GfQAAAABJRU5ErkJggg=='
+const ICON_HOLLOW = 'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAATklEQVR4nGNgGAXEgv///z/DhqluIEUWEGsoSYYTo5Esw0lRTLRaUl1BtHpyImXUYPINpmrkkepqstMxVTMILo10Ly9IMpQYC8g2cOQBABZn8ZCF7k0oAAAAAElFTkSuQmCC'
 import { startPause, extendPause, endPause, isPaused, canExtend } from './pause'
 import { IPC } from '../shared/ipc-channels'
 import { DASHBOARD_PORT } from '../shared/constants'
@@ -63,11 +65,8 @@ export function rebuildTrayMenu(): void {
   updateTrayIcon()
 }
 
-function loadIcon(filename: string): Electron.NativeImage {
-  const p = app.isPackaged
-    ? path.join(process.resourcesPath, filename)
-    : path.join(__dirname, `../../resources/${filename}`)
-  const img = nativeImage.createFromPath(p).resize({ width: 18, height: 18 })
+function makeIcon(b64: string): Electron.NativeImage {
+  const img = nativeImage.createFromBuffer(Buffer.from(b64, 'base64'))
   img.setTemplateImage(true)
   return img
 }
@@ -75,12 +74,12 @@ function loadIcon(filename: string): Electron.NativeImage {
 export function updateTrayIcon(): void {
   if (!tray) return
   const { mode } = getConfig()
-  tray.setImage(mode === 'focus' ? loadIcon('trayIcon.png') : loadIcon('trayIconFree.png'))
+  tray.setImage(makeIcon(mode === 'focus' ? ICON_FILLED : ICON_HOLLOW))
 }
 
 export function createTray(): void {
   const { mode } = getConfig()
-  const icon = mode === 'focus' ? loadIcon('trayIcon.png') : loadIcon('trayIconFree.png')
+  const icon = makeIcon(mode === 'focus' ? ICON_FILLED : ICON_HOLLOW)
 
   tray = new Tray(icon)
   tray.setToolTip('MirrorAgent')
