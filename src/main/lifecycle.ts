@@ -99,6 +99,19 @@ function broadcastModeChange(mode: 'focus' | 'free'): void {
   })
 }
 
+export function initMode(): void {
+  const config = getConfig()
+  if (!config.onboardingComplete) return
+  if (isPaused()) return
+
+  const inWorkHours = isWithinWorkingHours()
+  const correctMode = inWorkHours ? 'focus' : 'free'
+
+  if (config.mode !== correctMode) {
+    broadcastModeChange(correctMode)
+  }
+}
+
 export function startNudgeScheduler(): void {
   if (nudgeInterval) return
   sessionStart = Date.now()

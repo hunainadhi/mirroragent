@@ -12,7 +12,7 @@ import { createNotificationWindow, setupNotificationIpc } from './notifications'
 import { startWebSocketServer, stopWebSocketServer } from './websocket'
 import { startScoreUpdater, stopScoreUpdater, calculateScore } from './score'
 import { startDashboard, stopDashboard } from './dashboard'
-import { setupPowerMonitor, startNudgeScheduler, stopNudgeScheduler } from './lifecycle'
+import { setupPowerMonitor, startNudgeScheduler, stopNudgeScheduler, initMode } from './lifecycle'
 import {
   checkPermissions,
   openAccessibilitySettings,
@@ -185,6 +185,7 @@ function setupIpcHandlers(): void {
     createNotificationWindow()
     startScoreUpdater()
     startNudgeScheduler()
+    initMode()
   })
 
   ipcMain.handle(IPC.APPS_SCAN, async () => {
@@ -251,6 +252,7 @@ app.whenReady().then(() => {
     createNotificationWindow()
     startScoreUpdater()
     startNudgeScheduler()
+    initMode()
   }
 
   app.on('activate', () => {
