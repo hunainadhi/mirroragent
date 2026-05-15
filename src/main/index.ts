@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import * as path from 'path'
 import Anthropic from '@anthropic-ai/sdk'
 import { loadConfig, getConfig, saveConfig } from './config'
@@ -218,6 +218,13 @@ function setupIpcHandlers(): void {
   })
 
   ipcMain.handle(IPC.SCORE_GET, () => calculateScore())
+
+  ipcMain.handle(IPC.OPEN_EXTENSION_FOLDER, () => {
+    const extensionPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'extension')
+      : path.join(__dirname, '../../extension')
+    shell.openPath(extensionPath)
+  })
 
   ipcMain.handle(IPC.BLOCKED_APPS_GET, () => [])
   ipcMain.handle(IPC.BLOCKED_APPS_RESTORE, () => {})

@@ -87,6 +87,9 @@ contextBridge.exposeInMainWorld('mirrorAgent', {
   // HUD
   resizeHud: (expanded: boolean): void => ipcRenderer.send(IPC.HUD_RESIZE, expanded),
 
+  // Utilities
+  openExtensionFolder: (): Promise<void> => ipcRenderer.invoke(IPC.OPEN_EXTENSION_FOLDER),
+
   // Push events from main → renderer
   onModeChanged: (cb: (mode: Mode) => void): Unsubscribe => {
     const handler = (_: Electron.IpcRendererEvent, mode: Mode) => cb(mode)

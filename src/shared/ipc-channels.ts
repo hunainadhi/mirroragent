@@ -21,6 +21,7 @@ export const IPC = {
   SCORE_GET: 'score:get',
   NOTIFICATION_RESPOND: 'notification:respond',
   ONBOARDING_COMPLETE: 'onboarding:complete',
+  OPEN_EXTENSION_FOLDER: 'open:extension-folder',
 
   // Renderer → Main (send, no reply)
   HUD_RESIZE: 'hud:resize',

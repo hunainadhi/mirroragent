@@ -35,6 +35,7 @@ declare global {
       onNotificationFire: (cb: (data: unknown) => void) => Unsubscribe
       onNotificationCountdown: (cb: (seconds: number) => void) => Unsubscribe
       resizeHud: (expanded: boolean) => void
+      openExtensionFolder: () => Promise<void>
     }
   }
 }

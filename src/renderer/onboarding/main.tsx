@@ -445,15 +445,11 @@ function Section({ label, hint, children }: { label: string; hint?: string; chil
 // ── Screen 4: Browser Extension ────────────────────────────────────────────
 
 function ExtensionScreen({ onNext }: { onNext: () => void }) {
-  const [copied, setCopied] = React.useState(false)
+  const [opened, setOpened] = React.useState(false)
 
-  function copyPath() {
-    const extensionPath = window.mirrorAgent
-      ? '~/Applications/mirroragent.app/Contents/Resources/extension'
-      : 'MirrorAgent.app/Contents/Resources/extension'
-    navigator.clipboard.writeText(extensionPath).catch(() => {})
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  function openFolder() {
+    window.mirrorAgent.openExtensionFolder()
+    setOpened(true)
   }
 
   return (
@@ -468,26 +464,29 @@ function ExtensionScreen({ onNext }: { onNext: () => void }) {
           <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Install in Chrome or Brave</p>
           <ol className="space-y-3 text-sm text-zinc-300">
             <li className="flex gap-3">
-              <span className="text-zinc-600 font-mono text-xs mt-0.5 w-4 shrink-0">1.</span>
+              <span className="text-zinc-500 font-mono text-xs mt-0.5 shrink-0">1.</span>
               <span>Open <span className="font-medium text-white">chrome://extensions</span> or <span className="font-medium text-white">brave://extensions</span></span>
             </li>
             <li className="flex gap-3">
-              <span className="text-zinc-600 font-mono text-xs mt-0.5 w-4 shrink-0">2.</span>
+              <span className="text-zinc-500 font-mono text-xs mt-0.5 shrink-0">2.</span>
               <span>Enable <span className="font-medium text-white">Developer mode</span> (top-right toggle)</span>
             </li>
             <li className="flex gap-3">
-              <span className="text-zinc-600 font-mono text-xs mt-0.5 w-4 shrink-0">3.</span>
-              <span>Click <span className="font-medium text-white">Load unpacked</span> and select the extension folder</span>
+              <span className="text-zinc-500 font-mono text-xs mt-0.5 shrink-0">3.</span>
+              <span>Click <span className="font-medium text-white">Open folder in Finder</span> below — then drag that folder into the browser window</span>
             </li>
           </ol>
 
           <button
-            onClick={copyPath}
-            className="w-full mt-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 rounded-lg text-xs font-mono transition-colors flex items-center justify-center gap-2"
+            onClick={openFolder}
+            className="w-full mt-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
           >
-            {copied ? '✓ Copied' : '📋 Copy extension folder path'}
+            {opened ? '✓ Folder opened in Finder' : 'Open extension folder in Finder'}
           </button>
-          <p className="text-xs text-zinc-600 text-center">The extension is bundled inside MirrorAgent.app</p>
+
+          <p className="text-xs text-zinc-600 text-center">
+            In the Finder window, drag the folder into your browser's extensions page — or press <span className="font-mono text-zinc-500">⌘⇧G</span> in the browser's file picker to paste a path.
+          </p>
         </div>
 
         <div className="space-y-3 text-center">
