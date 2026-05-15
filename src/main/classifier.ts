@@ -1,0 +1,260 @@
+import { desktopCapturer } from 'electron'
+import Anthropic from '@anthropic-ai/sdk'
+import { eq } from 'drizzle-orm'
+import { getDb } from './database'
+import { getConfig } from './config'
+import { windowTracking } from '../shared/schema'
+import {
+  SCREENSHOT_INTERVAL_MS,
+  MIN_MS_BETWEEN_CALLS,
+  MAX_CALLS_PER_MINUTE,
+  CALIBRATION_THRESHOLDS,
+  DEFAULT_CONFIDENCE_THRESHOLD,
+} from '../shared/constants'
+import { getLastWindowInfo, resetLastWindowInfo } from './observer'
+import type { ActiveWindowInfo, ClassificationResult } from '../shared/types'
+
+let screenshotInterval: ReturnType<typeof setInterval> | null = null
+let lastCallAt = 0
+let callsThisMinute = 0
+let minuteWindowStart = Date.now()
+let lastKnownApp = ''
+let lastKnownUrl = ''
+
+// ── Rate limiter ───────────────────────────────────────────────────────────
+
+function canCallClaude(): boolean {
+  const now = Date.now()
+
+  // Reset per-minute counter
+  if (now - minuteWindowStart >= 60_000) {
+    callsThisMinute = 0
+    minuteWindowStart = now
+  }
+
+  if (now - lastCallAt < MIN_MS_BETWEEN_CALLS) return false
+  if (callsThisMinute >= MAX_CALLS_PER_MINUTE) return false
+  return true
+}
+
+function recordCall(): void {
+  lastCallAt = Date.now()
+  callsThisMinute++
+}
+
+// ── Screenshot ─────────────────────────────────────────────────────────────
+
+async function captureScreenshot(): Promise<string | null> {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: 1280, height: 800 },
+    })
+    const primary = sources[0]
+    if (!primary) return null
+
+    const png = primary.thumbnail.toPNG()
+    return png.toString('base64')
+  } catch {
+    return null
+  }
+}
+
+// ── Rolling context ────────────────────────────────────────────────────────
+
+function buildRollingContext(): string {
+  const db = getDb()
+  const rows = db
+    .select({
+      timestamp: windowTracking.timestamp,
+      appName: windowTracking.appName,
+      windowTitle: windowTracking.windowTitle,
+      url: windowTracking.url,
+    })
+    .from(windowTracking)
+    .orderBy(windowTracking.id)
+    .limit(10)
+    .all()
+    .slice(-10)
+
+  if (rows.length === 0) return 'No recent window history.'
+
+  return rows
+    .map((r) => {
+      const time = new Date(r.timestamp).toLocaleTimeString()
+      const loc = r.url ? r.url : r.windowTitle || r.appName
+      return `[${time}] ${r.appName} — ${loc}`
+    })
+    .join('\n')
+}
+
+// ── Confidence threshold ───────────────────────────────────────────────────
+
+function getThreshold(): number {
+  const { calibrationDays } = getConfig()
+  return CALIBRATION_THRESHOLDS[calibrationDays] ?? DEFAULT_CONFIDENCE_THRESHOLD
+}
+
+// ── Claude classification ──────────────────────────────────────────────────
+
+async function classify(
+  screenshot: string,
+  current: ActiveWindowInfo,
+  context: string,
+): Promise<ClassificationResult | null> {
+  const config = getConfig()
+  if (!config.apiKey) return null
+
+  const client = new Anthropic({ apiKey: config.apiKey })
+
+  const professionHint = config.profession.length
+    ? `The user is a ${config.profession.join(', ')}.`
+    : ''
+  const workAppsHint = config.workApps.length
+    ? `Their known work apps: ${config.workApps.join(', ')}.`
+    : ''
+  const taskHint = config.taskLabel ? `Current task: "${config.taskLabel}".` : ''
+
+  const systemPrompt = `You are MirrorAgent, a focus assistant. ${professionHint} ${workAppsHint} ${taskHint}
+Classify the user's current screen activity as work or distraction based on the screenshot and recent window history.
+Respond ONLY with valid JSON matching this schema:
+{"is_distraction": boolean, "confidence": number (0-100), "reason": string (max 20 words), "suggested_action": "block" | "notify" | "allow"}`
+
+  const userContent = `Recent window history (oldest → newest):
+${context}
+
+Current: ${current.appName}${current.url ? ` — ${current.url}` : current.windowTitle ? ` — ${current.windowTitle}` : ''}
+
+Classify this activity.`
+
+  try {
+    recordCall()
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 150,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: 'image/png', data: screenshot },
+            },
+            { type: 'text', text: userContent },
+          ],
+        },
+      ],
+    })
+
+    const text = response.content.find((b) => b.type === 'text')?.text ?? ''
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return null
+
+    const parsed = JSON.parse(jsonMatch[0]) as ClassificationResult
+    if (typeof parsed.is_distraction !== 'boolean' || typeof parsed.confidence !== 'number') {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+// ── Write result back to DB ────────────────────────────────────────────────
+
+function writeClassification(result: ClassificationResult): void {
+  const db = getDb()
+  // Update the most recent unclassified entry for this window
+  const latest = db
+    .select({ id: windowTracking.id })
+    .from(windowTracking)
+    .where(eq(windowTracking.classificationResult, null as unknown as string))
+    .orderBy(windowTracking.id)
+    .limit(1)
+    .all()
+    .pop()
+
+  if (!latest) return
+
+  db.update(windowTracking)
+    .set({
+      classificationResult: result.is_distraction ? 'distraction' : 'work',
+      confidence: result.confidence,
+      isDistraction: result.is_distraction,
+      actionTaken: result.suggested_action,
+    })
+    .where(eq(windowTracking.id, latest.id))
+    .run()
+}
+
+// ── Main loop tick ─────────────────────────────────────────────────────────
+
+async function tick(triggeredByChange = false): Promise<void> {
+  const config = getConfig()
+  if (!config.onboardingComplete || config.mode === 'free') return
+
+  const current = getLastWindowInfo()
+  if (!current) return
+
+  if (!canCallClaude()) return
+
+  const screenshot = await captureScreenshot()
+  if (!screenshot) return
+
+  const context = buildRollingContext()
+  const result = await classify(screenshot, current, context)
+  if (!result) return
+
+  writeClassification(result)
+
+  const threshold = getThreshold()
+  if (result.is_distraction && result.confidence >= threshold) {
+    // Day 7 will handle actual blocking — emit event for now
+    const { BrowserWindow } = await import('electron')
+    BrowserWindow.getAllWindows().forEach((w) => {
+      if (!w.isDestroyed()) {
+        w.webContents.send('classifier:result', { result, current })
+      }
+    })
+  }
+}
+
+// ── Change detection ───────────────────────────────────────────────────────
+
+function checkForChange(): void {
+  const current = getLastWindowInfo()
+  if (!current) return
+
+  const changed =
+    current.appName !== lastKnownApp || (current.url ?? '') !== lastKnownUrl
+
+  if (changed) {
+    lastKnownApp = current.appName
+    lastKnownUrl = current.url ?? ''
+    resetLastWindowInfo()
+    // Trigger immediate classification on app/URL change
+    tick(true).catch(() => {})
+  }
+}
+
+// ── Public API ─────────────────────────────────────────────────────────────
+
+export function startClassifier(): void {
+  if (screenshotInterval) return
+
+  // Regular 30s screenshot cycle
+  screenshotInterval = setInterval(() => {
+    tick().catch(() => {})
+  }, SCREENSHOT_INTERVAL_MS)
+
+  // Change detection runs on the observer cadence (5s)
+  setInterval(checkForChange, 5_000)
+}
+
+export function stopClassifier(): void {
+  if (screenshotInterval) {
+    clearInterval(screenshotInterval)
+    screenshotInterval = null
+  }
+}

@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { loadConfig, getConfig, saveConfig } from './config'
 import { initDatabase, closeDatabase } from './database'
 import { startObserver, stopObserver } from './observer'
+import { startClassifier, stopClassifier } from './classifier'
 import {
   checkPermissions,
   openAccessibilitySettings,
@@ -176,6 +177,7 @@ function setupIpcHandlers(): void {
     onboardingWindow?.close()
     startPermissionMonitor()
     startObserver()
+    startClassifier()
     // Day 6: create tray + HUD here
   })
 
@@ -199,6 +201,7 @@ app.whenReady().then(() => {
   } else {
     startPermissionMonitor()
     startObserver()
+    startClassifier()
     // Day 6: show tray instead of re-opening onboarding
     onboardingWindow = createOnboardingWindow()
   }
@@ -217,5 +220,6 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   if (permissionPollInterval) clearInterval(permissionPollInterval)
   stopObserver()
+  stopClassifier()
   closeDatabase()
 })
