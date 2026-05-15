@@ -21,6 +21,9 @@ let callsThisMinute = 0
 let minuteWindowStart = Date.now()
 let lastKnownApp = ''
 let lastKnownUrl = ''
+// Cache last result per app+url — skip re-classification if still work
+let lastCacheKey = ''
+let lastCacheResult: 'work' | 'distraction' | null = null
 
 // ── Rate limiter ───────────────────────────────────────────────────────────
 
@@ -49,7 +52,7 @@ async function captureScreenshot(): Promise<string | null> {
   try {
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
-      thumbnailSize: { width: 1280, height: 800 },
+      thumbnailSize: { width: 640, height: 400 },
     })
     const primary = sources[0]
     if (!primary) return null
@@ -131,8 +134,8 @@ Classify this activity.`
   try {
     recordCall()
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 150,
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 100,
       system: systemPrompt,
       messages: [
         {
@@ -200,6 +203,10 @@ async function tick(triggeredByChange = false): Promise<void> {
 
   if (!canCallClaude()) return
 
+  // Skip if same app+URL was classified as work since last change
+  const cacheKey = `${current.appName}|${current.url ?? ''}`
+  if (cacheKey === lastCacheKey && lastCacheResult === 'work' && !triggeredByChange) return
+
   const screenshot = await captureScreenshot()
   if (!screenshot) return
 
@@ -208,6 +215,8 @@ async function tick(triggeredByChange = false): Promise<void> {
   if (!result) return
 
   writeClassification(result)
+  lastCacheKey = cacheKey
+  lastCacheResult = result.is_distraction ? 'distraction' : 'work'
 
   const threshold = getThreshold()
   if (result.is_distraction && result.confidence >= threshold) {
@@ -227,8 +236,9 @@ function checkForChange(): void {
   if (changed) {
     lastKnownApp = current.appName
     lastKnownUrl = current.url ?? ''
+    lastCacheKey = ''
+    lastCacheResult = null
     resetLastWindowInfo()
-    // Trigger immediate classification on app/URL change
     tick(true).catch(() => {})
   }
 }

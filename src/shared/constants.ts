@@ -3,9 +3,9 @@ export const DB_FILENAME = 'mirror.db'
 export const CONFIG_FILENAME = 'config.json'
 
 export const OBSERVATION_INTERVAL_MS = 5_000
-export const SCREENSHOT_INTERVAL_MS = 30_000
-export const MIN_MS_BETWEEN_CALLS = 25_000
-export const MAX_CALLS_PER_MINUTE = 2
+export const SCREENSHOT_INTERVAL_MS = 60_000
+export const MIN_MS_BETWEEN_CALLS = 60_000
+export const MAX_CALLS_PER_MINUTE = 1
 
 export const WEBSOCKET_PORT = 1423
 export const DASHBOARD_PORT = 1422
